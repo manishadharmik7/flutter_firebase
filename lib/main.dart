@@ -1,11 +1,11 @@
 import 'dart:io';
-
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
+
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -24,24 +24,11 @@ Future<void> setupFlutterNotifications() async {
   if (isFlutterLocalNotificationsInitialized) {
     return;
   }
-
-  if (Platform.isIOS) {
-    // Request notification permissions for iOS
-    await FirebaseMessaging.instance.requestPermission(
-      alert: true,
-      announcement: false,
-      badge: true,
-      carPlay: false,
-      criticalAlert: false,
-      provisional: false,
-      sound: true,
-    );
-  }
-
   channel = const AndroidNotificationChannel(
     'high_importance_channel', // id
     'High Importance Notifications', // title
-    description: 'This channel is used for important notifications.', // description
+    description:
+        'This channel is used for important notifications.', // description
     importance: Importance.high,
   );
 
@@ -52,6 +39,8 @@ Future<void> setupFlutterNotifications() async {
           AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
 
+  /// Update the iOS foreground notification presentation options to allow
+  /// heads up notifications.
   await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
     alert: true,
     badge: true,
@@ -62,9 +51,9 @@ Future<void> setupFlutterNotifications() async {
   alert: true,
   badge: true,
   sound: true,
-);
-print('User granted permission: ${settings.authorizationStatus}');
+  );
 
+print('User granted permission: ${settings.authorizationStatus}');
 
   isFlutterLocalNotificationsInitialized = true;
 }
@@ -82,6 +71,8 @@ void showFlutterNotification(RemoteMessage message) {
           channel.id,
           channel.name,
           channelDescription: channel.description,
+          // TODO add a proper drawable resource to android, for now using
+          //      one that already exists in example app.
           icon: 'launch_background',
         ),
       ),
@@ -89,16 +80,19 @@ void showFlutterNotification(RemoteMessage message) {
   }
 }
 
+/// Initialize the [FlutterLocalNotificationsPlugin] package.
 late FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  if (!kIsWeb) {
-    await setupFlutterNotifications();
+   await Permission.notification.request();
+   if (await Permission.notification.isDenied) {
+    await Permission.notification.request();
   }
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
   print('Got a message whilst in the foreground!');
   print('Message data: ${message.data}');
@@ -106,11 +100,11 @@ void main() async {
   if (message.notification != null) {
     print('Message also contained a notification: ${message.notification}');
   }
-});
-  
-   String? token = await FirebaseMessaging.instance.getToken();
-    print("Device Token: $token");
-
+    });
+    
+  if (!kIsWeb) {
+    await setupFlutterNotifications();
+  }
   runApp(const MyApp());
 }
 
